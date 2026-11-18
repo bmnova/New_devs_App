@@ -29,3 +29,25 @@ async def get_dashboard_summary(
         "currency": revenue_data['currency'],
         "reservations_count": revenue_data['count']
     }
+
+
+@router.get("/dashboard/properties")
+async def get_dashboard_properties(
+    current_user: dict = Depends(get_current_user)
+):
+    """Properties owned by the current user's tenant (for the property selector)."""
+    tenant_id = getattr(current_user, "tenant_id", None)
+    if not tenant_id:
+        raise HTTPException(status_code=403, detail="No tenant associated with user")
+
+    from sqlalchemy import text
+    from app.core.database_pool import DatabasePool
+
+    db_pool = DatabasePool()
+    await db_pool.initialize()
+    async with db_pool.get_session() as session:
+        result = await session.execute(
+            text("SELECT id, name, timezone FROM properties WHERE tenant_id = :tenant_id ORDER BY id"),
+            {"tenant_id": tenant_id},
+        )
+        return [{"id": r.id, "name": r.name, "timezone": r.timezone} for r in result.fetchall()]
